@@ -7,7 +7,8 @@ from flask_debugtoolbar import DebugToolbarExtension
 
 app = Flask(__name__)
 app.secret_key = "SECRETSECRETSECRET"
-
+EVENTBRITE_TOKEN=os.environ['EVENTBRITE_TOKEN']
+EVENTBRITE_URL = "https://www.eventbriteapi.com/v3/"
 
 @app.route("/")
 def homepage():
@@ -41,18 +42,17 @@ def find_afterparties():
         distance = distance + measurement
 
         # TODO: Look for afterparties!
-        payload = {'token':'ADWVQHESQSSQPD3IW65K', 'q': query}
+        
+        payload = {'token':EVENTBRITE_TOKEN, 'q': query, 'location.address': location, 'location.within': distance, 'sort_by': sort}
         r = requests.get("https://www.eventbriteapi.com/v3/events/search/", params=payload)
-        print r.content
-        print "======="
-        data_json = r.json()
+        data = r.json()
         # - Make a request to the Eventbrite API to search for events that match
         #   the form data.
         # - (Make sure to save the JSON data from the response to the data
         #   variable so that it can display on the page as well.)
 
-        data = {'This': ['Some', 'mock', 'JSON']}
-        events = []
+        # data = {'This': ['Some', 'mock', 'JSON']}
+        events =data['events']
 
         return render_template("afterparties.html",
                                data=pformat(data),
@@ -84,6 +84,20 @@ def create_eventbrite_event():
     timezone = request.form.get('timezone')
     currency = request.form.get('currency')
 
+    payload = {'event.name.html': name,
+               'event.start.utc': start_time,
+               'event.start.timezone': timezone,
+               'event.end.utc': end_time,
+               'event.end.timezone': timezone,
+               'event.currency': currency,
+               }
+
+    headers = {'Authorization': 'Bearer ' + EVENTBRITE_TOKEN}
+
+    response = requests.post(EVENTBRITE_URL + "events/",
+                             data=payload,
+                             headers=headers)
+    data = response.json()
     # TODO: Create my event!
 
     # - Make a request to the Eventbrite API to create a new event using the
@@ -97,8 +111,13 @@ def create_eventbrite_event():
     # else:
     #     flash('OAuth failed: {}'.format(data['error_description']))
     #     return redirect("/create-event")
+    if response.ok:
+        flash("Your event was created! Here's the link: {}".format(data['url']))
+        return redirect("/")
+    else:
+        flash("Error: {}".format(data['error_description']))
+        return redirect("/create-event")
 
-    return redirect("/")
 
 
 ############ Further Study ############
@@ -169,4 +188,4 @@ if __name__ == "__main__":
     app.debug = True
     app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
     DebugToolbarExtension(app)
-    app.run()
+    app.run(host = '0.0.0.0')
